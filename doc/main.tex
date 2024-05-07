@@ -1,0 +1,353 @@
+\documentclass[
+  french,
+  a4paper,
+]{scrartcl}
+
+\usepackage[pages=some]{background}
+
+\usepackage{amsmath,amssymb}
+\usepackage[french]{babel}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage{tabularx}
+\usepackage{listings}
+
+\usepackage{lmodern}
+
+\usepackage[
+  top=2cm, 
+  bottom=3.5cm, 
+  left=2cm, 
+  right=2cm
+  ]{geometry}
+\usepackage[hidelinks]{hyperref}
+
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{backcolour},   
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{magenta},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,         
+    breaklines=true,                 
+    captionpos=b,                    
+    keepspaces=true,                 
+    numbers=left,                    
+    numbersep=5pt,                  
+    showspaces=false,                
+    showstringspaces=false,
+    showtabs=false,                  
+    tabsize=2
+}
+\lstset{style=mystyle}
+
+\renewcommand{\arraystretch}{1.2}
+\setlength {\parindent}{0em}
+\setlength {\parskip}{1em}
+
+\usepackage{scrlayer-scrpage}
+
+\setlength{\headsep}{0.5cm}
+\setlength{\headheight}{2cm}
+
+\makeatletter
+\renewcommand*\maketitle{
+  \begin{center}
+    \sffamily
+  
+    \vspace*{10pt}
+    \Large 3259.1 Paradigmes de programmation avancés II $\cdot$ 2023-2024 $\cdot$ ISC3il-a
+
+    \line(1,0){170mm}
+
+    \huge \textbf{Laboratoire 2 : Monitoring de la concurrence avec le pattern producteurs/consommateurs en Java}    
+
+    \line(1,0){170mm}
+  \end{center}
+
+    \vspace{10pt}
+    
+    \sffamily
+    \Large Nima Dekhli \hfill \today
+    
+    \vspace{8pt}
+}
+
+\makeatother
+
+% setup header on title page
+\clearpairofpagestyles
+
+\newpairofpagestyles{firstpage}{
+   \ihead{
+    \includegraphics*[height=1.5cm]{img/he-arc.png}
+  }
+  \ohead{
+       \includegraphics*[height=1.0cm]{img/hes-so.png}
+  } 
+}
+
+
+\begin{document}
+\maketitle
+\rmfamily
+\normalsize
+\tableofcontents
+\thispagestyle{firstpage}
+\newpage
+
+\section{Introduction}
+
+Dans le cadre d'un laboratoire du cours de paradigmes de programmation avancés II, 
+il nous a été demandé de réaliser un programme de monitoring de la concurrence 
+en utilisant le pattern producteurs/consommateurs. En particulier, 
+il nous a été demandé de mesurer les performances, telles que débit 
+et la latence. 
+
+
+\section{Implémentation}
+
+\subsection{Buffer}
+
+Afin d'implémenter le pattern de producteurs/consommateurs, on utilise un 
+Buffer circulaire, implémenté dans la classe \lstinline{ch.hearc.nde.buffer.CircularBuffer}. 
+
+% TODO: 
+
+\subsection{Producteurs et consommateurs}
+
+% TODO:
+
+\subsection{Modification en temps réel des paramètres}
+
+Le programme permet une modification en temps réel du nombre de consommateurs, de 
+producteur, de la taille du buffer et de la taille d'échantillonnage. 
+
+Lorsqu'un de ces paramètres est modifié, on réinitialise le programme. On commence
+par arrêter tous les threads producteurs et consommateurs, on vide le buffer et on
+réinitialise les statistiques. Ensuite, on recrée les threads producteurs et consommateurs
+avec les nouveaux paramètres.
+
+Ceci permet d'éviter des problèmes de concurrence lors de la modification des paramètres mais 
+cela implique un certain délai lors de la modification des paramètres et des 
+statistiques qui ne sont pas représentatives pendant ce laps de temps.
+
+\subsection{Mesures}
+
+\subsubsection*{Méthode}
+
+Afin de mesurer le débit (quantité de données traitées par unité de temps) et la 
+latence (délai entre la production et la consommation de la donnée), une classe 
+de gestion des statistiques est contenue dans le gestionnaire de buffer. 
+A chaque lecture et écriture, 
+un appel est effectué sur le gestionnaire de statistiques pour le mettre à jour.
+
+Afin de mesure le \textbf{débit} (quantité de données traitées par unité de temps) et la 
+\textbf{latence} (délai entre le début de la production et la fin de la consommation), une 
+classe de gestion des statistiques a été créée. Elle permet de notifier un début de production, 
+une fin de consommation et la récupération des statistiques. 
+
+Afin de calculer la latence sur une même donnée, on fourni un hash unique à chaque pour 
+identifier la donnée. En l'occurrence, on utilise la méthode \lstinline{String.hashCode()}
+sur le message, qui renvoie un nombre entier déterminé par le contenu de la chaîne. Comme 
+chaque producteur génère un message unique à chaque itération (composé de 
+l'indice d'itération et de l'identifiant du producteur), on peut utiliser ce hash 
+comme identifiant. 
+
+Les valeurs statistiques (latence et débit) sont moyennés sur la taille d'échantillonnage. Cela signifie 
+qu'on effectue une moyenne sur les $N$ derniers éléments qui ont été traités (produits et consommés). 
+Cela signifie également que si la pipeline est bloquée (par exemple parce que la taille du buffer est de 0), 
+les mesures ne seront pas immédiatement influencées. Une fois la pipeline débloquée, on pourra 
+éventuellement voir une augmentation de la latence, qui dépendra du temps total de bloquage, de la 
+taille d'échantillonnage et de la taille du buffer. 
+
+\subsubsection*{Classe utilitaire de gestion des statistiques}
+
+La gestion des statistiques est effectuée par la classe \lstinline{ch.hearc.nde.manager.StatisticsManager}. 
+Avant de commencer la production, la méthode \lstinline{StatisticsManager.produce(String msg)} est appelée. 
+Cela permet de notifier le début de la production d'un élément. Après avoir consommé l'élément, 
+la méthode \lstinline{StatisticsManager.consume(String msg)} est appelée. Cela permet de notifier la fin
+de la consommation de l'élément. 
+
+\subsubsection*{Latence}
+
+On définit la latence comme le temps écoulé entre le début de la production et la fin de la consommation. 
+
+A chaque appel de \lstinline{StatisticsManager.produce(String msg)}, on enregistre le timestamp actuel dans une Map 
+qui associe le hash du message à un timestamp. Au moment de l'appel à \lstinline{StatisticsManager.consume(String msg)},
+on récupère le timestamp associé au hash et on calcule la différence avec le timestamp actuel. On ajoute 
+cette différence à une liste de latences. Si la liste excède la taille d'échantillonnage, on retire le premier
+élément de la liste (le plus ancien). 
+Pour calculer la latence moyenne, on retourne la moyenne de tous les éléments de cette liste.
+
+\subsubsection*{Débit}
+
+On définit le débit comme le nombre d'éléments entièrement traités par unité de temps. Cela correspond
+ainsi en réalité au débit de consommation, puisque le débit de production est limité par ce dernier.
+
+A chaque appel de \lstinline{StatisticsManager.consume(String msg)}, on ajoute le timestamp actuel à une liste de
+timestamps. Si la liste excède la taille d'échantillonnage, on retire le premier élément de la liste (le plus ancien). 
+Pour calculer le débit, on divise le nombre d'éléments dans la liste par la différence entre le timestamp le plus récent et 
+le plus ancien. 
+
+\subsection{MBeans et JConsole}
+
+Afin de simplifier les tests et de permettre une certaine interactivité, on utilise 
+les MBeans qui peuvent ensuite être lues et modifiées avec la JConsole. 
+
+Les valeurs qui peuvent être modifiées en temps réel sont les suivantes :
+
+\begin{itemize}
+  \item Le nombre de consommateurs 
+  \item Le nombre de producteurs 
+  \item La taille du buffer
+  \item La taille d'échantillonnage
+\end{itemize}
+
+Les valeurs qui peuvent uniquement être lues sont les suivantes : 
+
+\begin{itemize}
+  \item Le débit moyen (en nombre d'éléments traités par seconde, moyenne selon la taille d'échantillonnage)
+  \item La latence moyenne (en millisecondes, moyenne selon la taille d'échantillonnage)
+  \item Le nombre d'éléments actuellement dans le buffer (éléments produits mais pas encore consommées)
+\end{itemize}
+
+Pour chaque élément pouvant être modifié, on ajoute un \textit{getter} et un \textit{setter} dans l'interface
+\lstinline{ch.hearc.nde.manager.BufferManagerMBean} et pour chaque élément pouvant être lu, on ajoute un \textit{getter}. 
+La classe \lstinline{ch.hearc.nde.manager.BufferManager} implémente cette interface et est enregistrée en tant que MBean
+au début de l'exécution du programme.
+
+
+\section{Protocoles de tests et résultats attendus}
+
+Dans cette section sont détaillées les différentes mesures que nous effectuerons sur le programme, 
+ainsi que les résultats attendus. On souhaite en particulier observer l'impact de la taille du buffer, 
+du nombre de producteurs et du nombre de consommateurs sur le débit et la latence. 
+
+On divisera alors le protocole en trois parties : Lorsque le nombre de producteurs est égal 
+au nombre de consommateurs, lorsque le nombre de producteurs est supérieur au nombre de consommateurs
+et lorsque le nombre de producteurs est inférieur au nombre de consommateurs. Dans chacun des cas, 
+on évaluera également l'impact de la taille du buffer. 
+
+\subsection{Nombre de producteurs égal au nombre de consommateurs}
+
+\subsubsection*{Valeurs de test}
+
+\begin{table}[h]
+  \centering
+  \begin{tabular}{l|l}
+    \textbf{Attribut}  & \textbf{Valeur} \\
+    \hline
+    Nombre de producteurs & 100 \\
+    Nombre de consommateurs & 100 \\
+    Taille du buffer & 1000 \\
+  \end{tabular}
+\end{table}
+
+\subsubsection*{Résultats attendus}
+
+%TODO: change the value xxx
+Comme les producteurs et les consommateurs ont chacun un délai constant et connu (xxx ms) pour 
+produire et consommer un élément, il ne devrait pas y avoir de goulot d'étranglement et le débit 
+devrait être maximal et la latence minimale (pour le nombre de producteurs et consommateurs choisis).
+
+\subsubsection*{Débit théorique}
+
+$$
+d_{th} = \frac{\text{Nombre de consommateurs}}{\text{Temps de consommation}} = \frac{100}{0.5} = 200 \text{ éléments/s}
+$$
+
+\subsubsection*{Latence théorique}
+
+$$
+l_{th} = \text{Temps de production} + \text{Temps de consommation} = 0.5 + 0.5 = 1 \text{ s}
+$$
+
+\subsection{Nombre de producteurs supérieur au nombre de consommateurs}
+
+\subsubsection*{Valeurs de test}
+
+\begin{table}[h]
+  \centering
+  \begin{tabular}{l|l}
+    \textbf{Attribut}  & \textbf{Valeur} \\
+    \hline
+    Nombre de producteurs & 1000 \\
+    Nombre de consommateurs & 100 \\
+    Taille du buffer & 1000 \\
+  \end{tabular}
+\end{table}
+
+\subsubsection*{Résultats attendus}
+
+Dans ce cas, le débit devrait entièrement être limité par les consommateurs. Ajouter plus de 
+producteurs ne le fera donc pas augmenter. Toutefois, la latence sera influencée par le grand 
+nombre de producteurs. En effet, ces derniers devront attendre que le buffer soit libéré pour
+pouvoir y écrire. Comme ils sont 10 fois plus nombreux que les consommateurs, on s'attend 
+à ce que la latence soit 10 fois plus grande que dans un cas équilibré.
+
+\subsubsection*{Débit théorique}
+
+$$
+d_{th} = \frac{\text{Nombre de consommateurs}}{\text{Temps de consommation}} = \frac{100}{0.5} = 200 \text{ éléments/s}
+$$
+
+\subsubsection*{Latence théorique}
+
+$$
+l_{th} = \frac{\text{Nombre de producteurs}}{\text{Nombre de consommateurs}} \cdot (\text{Tps de production} + \text{Tps de consommation}) = \frac{1000}{100} \cdot (0.5 + 0.5) = 10 \text{ s}
+$$
+
+\subsection{Nombre de producteurs inférieur au nombre de consommateurs}
+
+\subsubsection*{Valeurs de test}
+
+\begin{table}[h]
+  \centering
+  \begin{tabular}{l|l}
+    \textbf{Attribut}  & \textbf{Valeur} \\
+    \hline
+    Nombre de producteurs & 100 \\
+    Nombre de consommateurs & 1000 \\
+    Taille du buffer & 1000 \\
+  \end{tabular}
+\end{table}
+
+\subsubsection*{Résultats attendus}
+
+Dans ce cas, les producteurs travailleront à plein régime, mais les consommateurs devront 
+attendre qu'une donnée soit disponible dans le buffer pour la consommer. Le débit sera donc 
+limité par le nombre de producteurs. On pourrait penser que la latence sera également augmentée 
+car les consommateurs devront attendre plus longtemps pour obtenir une donnée. Toutefois,
+comme la latence est calculée sur le temps qu'une \textbf{donnée} met à être produite et consommée,
+elle n'augmentera pas. En effet, une fois produite, elle est immédiatement consommée par l'un 
+des nombreux consommateurs disponibles et en attente. 
+
+\subsubsection*{Débit théorique}
+
+$$
+d_{th} = \frac{\text{Nombre de producteurs}}{\text{Temps de production}} = \frac{100}{0.5} = 200 \text{ éléments/s}
+$$
+
+\subsubsection*{Latence théorique}
+
+$$
+l_{th} = \text{Temps de production} + \text{Temps de consommation} = 0.5 + 0.5 = 1 \text{ s}
+$$
+
+\section{Résultats}
+
+Dans cette section sont présentés les résultats des tests effectués. 
+
+\section{Analyse}
+
+Dans cette section sont analysés et discutés les résultats obtenus. En particulier, 
+on compare les résultats obtenus avec les résultats attendus.
+
+\section{Conclusion}
+ 
+ 
+\end{document}
