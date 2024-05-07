@@ -13,4 +13,6 @@ public interface BufferManagerMBean {
     void setBufferSize(int n);
     double getAverageLatency();
     double getAverageDebit();
+    int getSampleSize();
+    void setSampleSize(int n);
 }

@@ -1,18 +1,49 @@
 package ch.hearc.nde.buffer;
 
-import ch.hearc.nde.manager.StatisticsManager;
-
+/**
+ * Circular buffer implementation.
+ * <br>
+ * See <a href="https://en.wikipedia.org/wiki/Circular_buffer">Wikipedia</a>.
+ * <br>
+ * This implementation permits dynamic resizing of the buffer.
+ * <br>
+ * <strong>Warning : </strong> resizing the buffer will remove all the messages in the buffer.
+ */
 public class CircularBuffer {
-    private StatisticsManager statisticsManager;
+    /**
+     * The array representing the buffer.
+     */
     private String[] buffer;
+
+    /**
+     * The number of elements currently in the buffer.
+     */
     private int size;
+
+    /**
+     * The index of the first element in the buffer.
+     */
     private int front;
+
+    /**
+     * The index of the last element in the buffer.
+     */
     private int rear;
 
+    /**
+     * Creates a new circular buffer with a given size.
+     * @param n The size maximum size of the buffer.
+     */
     public CircularBuffer(int n) {
         init(n);
     }
 
+    /**
+     * Produces a message in the buffer.
+     * If the buffer is full, the thread will wait until a message is consumed.
+     * @param message The message to publish.
+     * @throws InterruptedException If the thread is interrupted while waiting.
+     */
     public synchronized void produce(String message) throws InterruptedException {
         while(isFull()) wait();
 
@@ -20,11 +51,15 @@ public class CircularBuffer {
         updateRear();
         this.size++;
 
-        statisticsManager.produce(message.hashCode());
-
         notifyAll();
     }
 
+    /**
+     * Consumes a message from the buffer.
+     * If the buffer is empty, the thread will wait until a message is produced.
+     * @return the message consumed.
+     * @throws InterruptedException If the thread is interrupted while waiting.
+     */
     public synchronized String consume() throws InterruptedException {
         while(isEmpty()) wait();
 
@@ -32,28 +67,32 @@ public class CircularBuffer {
         updateFront();
         this.size--;
 
-        statisticsManager.consume(msg.hashCode());
-
         notifyAll();
         return msg;
     }
 
+    /**
+     * Updates the size of the buffer and resets it.
+     * @param n The new size of the buffer.
+     */
     public synchronized void updateSizeAndReset(int n){
         assert n > 0;
         init(n);
     }
 
     private synchronized void init(int n){
-        this.statisticsManager = new StatisticsManager();
         this.buffer = new String[n];
         this.size = 0;
         this.front = 0;
         this.rear = 0;
     }
 
+    /**
+     * Clears the buffer.
+     */
     public synchronized void clear(){
         init(this.buffer.length);
-        System.out.println("Cleared buffer");
+        System.out.println("Buffer cleared");
     }
 
     private synchronized void updateFront() {
@@ -72,20 +111,19 @@ public class CircularBuffer {
         return this.size <= 0;
     }
 
+    /**
+     * Returns the current number of elements in the buffer.
+     * @return The current number of elements in the buffer.
+     */
     public int getCurrentSize() {
         return this.size;
     }
 
+    /**
+     * Returns the maximum size of the buffer.
+     * @return The maximum size of the buffer.
+     */
     public int getSize() {
         return this.buffer.length;
     }
-
-    public double getAverageLatency() {
-        return statisticsManager.getAverageLatency();
-    }
-
-    public double getDebit() {
-        return statisticsManager.getDebit();
-    }
-
 }

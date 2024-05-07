@@ -1,22 +1,21 @@
 package ch.hearc.nde.producerconsumers;
 
 import ch.hearc.nde.buffer.CircularBuffer;
+import ch.hearc.nde.manager.StatisticsManager;
 
 public abstract class ProducerConsumer extends Thread {
     protected final CircularBuffer buffer;
+    protected final StatisticsManager statistics;
     protected final int id;
     private final boolean infinite;
     private static final int NB_ITER_IF_NOT_INFINITE = 10;
-    private int operationDuration = 200;
+    protected int operationDuration = 500;
 
-    public ProducerConsumer(CircularBuffer buffer, int id, boolean infinite) {
+    public ProducerConsumer(CircularBuffer buffer, StatisticsManager statisticsManager, int id, boolean infinite) {
         this.buffer = buffer;
+        this.statistics = statisticsManager;
         this.id = id;
         this.infinite = infinite;
-    }
-
-    public ProducerConsumer(CircularBuffer buffer, int id) {
-        this(buffer, id, false);
     }
 
     protected void log(String msg) {
@@ -32,7 +31,6 @@ public abstract class ProducerConsumer extends Thread {
     private void runInfinitely() throws InterruptedException {
         int i = 0;
         while (true) {
-            Thread.sleep(operationDuration);
             operate(i++);
         }
     }
@@ -46,7 +44,6 @@ public abstract class ProducerConsumer extends Thread {
 
     @Override
     public void run() {
-        log("started run method");
         try {
             if (infinite) {
                 runInfinitely();
@@ -54,7 +51,6 @@ public abstract class ProducerConsumer extends Thread {
                 runNTimes();
             }
         } catch (InterruptedException ignored) {
-            log("interrupted");
         }
     }
 

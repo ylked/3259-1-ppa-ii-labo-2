@@ -12,6 +12,7 @@ public class BufferManager implements Runnable, BufferManagerMBean {
     private final List<Consumer> consumers;
     private final List<Producer> producers;
     private final CircularBuffer buffer;
+    private final StatisticsManager statisticsManager;
     private final boolean infinite;
 
     /**
@@ -22,6 +23,8 @@ public class BufferManager implements Runnable, BufferManagerMBean {
 
     public BufferManager(int buffersize, int nProducers, int nConsumers, boolean infinite) {
         this.buffer = new CircularBuffer(buffersize);
+        this.statisticsManager = new StatisticsManager();
+
         this.producers = new ArrayList<>();
         this.consumers = new ArrayList<>();
         this.infinite = infinite;
@@ -32,13 +35,13 @@ public class BufferManager implements Runnable, BufferManagerMBean {
 
     private void createProducers(int n){
         for (int i = 0; i < n; i++) {
-            this.producers.add(new Producer(this.buffer, i, infinite));
+            this.producers.add(new Producer(this.buffer, this.statisticsManager, i, infinite));
         }
     }
 
     private void createConsumers(int n){
         for (int i = 0; i < n; i++) {
-            this.consumers.add(new Consumer(this.buffer, i, infinite));
+            this.consumers.add(new Consumer(this.buffer, this.statisticsManager, i, infinite));
         }
     }
 
@@ -52,29 +55,11 @@ public class BufferManager implements Runnable, BufferManagerMBean {
 
     public void changeBufferSize(int n) {
         this.buffer.updateSizeAndReset(n);
+        // we restart the producers and consumers, but keep the same number of each
+        changeNbProducersConsumers(this.consumers.size(), this.producers.size());
     }
 
-    public void changeNbProducers(int n) {
-        this.producers.forEach(producer -> {
-            producer.interrupt();
-            try{
-                producer.join();
-            } catch (InterruptedException ignored){
-            }
-        });
-
-        System.out.println("Producers stopped");
-
-        this.producers.clear();
-        this.buffer.clear();
-
-        createProducers(n);
-        startProducers();
-
-        System.out.println("Producers started");
-    }
-
-    public void changeNbConsumers(int n) {
+    private void stopConsumers(){
         this.consumers.forEach(consumer -> {
             consumer.interrupt();
             try{
@@ -82,16 +67,46 @@ public class BufferManager implements Runnable, BufferManagerMBean {
             } catch (InterruptedException ignored){
             }
         });
+    }
 
+    private void stopProducers(){
+        this.producers.forEach(producer -> {
+            producer.interrupt();
+            try{
+                producer.join();
+            } catch (InterruptedException ignored){
+            }
+        });
+    }
+
+    private void changeNbProducersConsumers(int consumers, int producers){
+        stopConsumers();
+        stopProducers();
+
+        System.out.println("Producers stopped");
         System.out.println("Consumers stopped");
 
+        this.producers.clear();
         this.consumers.clear();
         this.buffer.clear();
+        this.statisticsManager.reset();
 
-        createConsumers(n);
+        createProducers(producers);
+        createConsumers(consumers);
+        startProducers();
         startConsumers();
 
+        System.out.println("Producers started");
         System.out.println("Consumers started");
+    }
+
+
+    public void changeNbConsumers(int n) {
+        changeNbProducersConsumers(n, this.producers.size());
+    }
+
+    public void changeNbProducers(int n) {
+        changeNbProducersConsumers(this.consumers.size(), n);
     }
 
     public void stop(){
@@ -146,11 +161,21 @@ public class BufferManager implements Runnable, BufferManagerMBean {
 
     @Override
     public double getAverageLatency() {
-        return buffer.getAverageLatency();
+        return statisticsManager.getAverageLatency();
     }
 
     @Override
     public double getAverageDebit() {
-        return buffer.getDebit();
+        return statisticsManager.getDebit();
+    }
+
+    @Override
+    public int getSampleSize() {
+        return statisticsManager.getSampleSize();
+    }
+
+    @Override
+    public void setSampleSize(int n) {
+        statisticsManager.setSampleSize(n);
     }
 }
